@@ -34,18 +34,7 @@ export default function Register() {
         }
 
         if (session) {
-            // Create profile record (triggered by Supabase triggers ideally, but can do manually if needed)
-            // For now we rely on just Auth. A trigger in DB is better for profiles table.
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .insert([
-                    { id: session.user.id, email: session.user.email, full_name: fullName }
-                ]);
 
-            if (profileError) {
-                console.error("Error creating profile:", profileError);
-                // Continue anyway as auth succeeded
-            }
 
             navigate('/dashboard');
         } else {
