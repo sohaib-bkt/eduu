@@ -1,5 +1,16 @@
 import { supabase } from './supabase';
 
+// Profiles
+export async function getUserProfile(userId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 // Courses
 export async function getCourses(filters?: { category?: string; difficulty?: string; search?: string }) {
   let query = supabase.from('courses').select('*');
@@ -25,6 +36,16 @@ export async function getCourseById(id: string) {
     .select('*, modules(*, lessons(*))')
     .eq('id', id)
     .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function getInstructorCourses(instructorId: string) {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('instructor_id', instructorId)
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return data;
 }
@@ -147,17 +168,6 @@ export async function createMessage(userId: string, title: string, content: stri
     .from('messages')
     .insert({ user_id: userId, title, content });
   if (error) throw error;
-}
-
-// Profile
-export async function getUserProfile(userId: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-  if (error) throw error;
-  return data;
 }
 
 export async function updateUserProfile(userId: string, updates: { full_name?: string; avatar_url?: string }) {

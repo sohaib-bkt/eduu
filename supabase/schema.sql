@@ -4,6 +4,7 @@ create table public.profiles (
   email text,
   full_name text,
   avatar_url text,
+  role text default 'user' check (role in ('user', 'admin')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -77,6 +78,8 @@ create table public.lessons (
   module_id uuid references public.modules(id) on delete cascade not null,
   title text not null,
   video_url text,
+  audio_url text,
+  pdf_url text,
   content text,
   duration integer, -- in seconds
   order_index integer not null,

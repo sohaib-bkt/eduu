@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, BookOpen, User, LogOut } from 'lucide-react';
+import { Menu, X, BookOpen, User, LogOut, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 
@@ -10,6 +10,7 @@ export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [session, setSession] = useState<Session | null>(null);
     const [scrolled, setScrolled] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -24,16 +25,36 @@ export default function Navbar() {
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
+            if (session?.user?.id) {
+                checkAdminRole(session.user.id);
+            }
         });
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
+            if (session?.user?.id) {
+                checkAdminRole(session.user.id);
+            }
         });
 
         return () => subscription.unsubscribe();
     }, []);
+
+    const checkAdminRole = async (userId: string) => {
+        try {
+            const { data } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', userId)
+                .single();
+
+            setIsAdmin(data?.role === 'admin');
+        } catch (err) {
+            setIsAdmin(false);
+        }
+    };
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();
@@ -93,6 +114,19 @@ export default function Navbar() {
                     <div className="hidden md:flex items-center space-x-4">
                         {session ? (
                             <div className="flex items-center space-x-4">
+                                {isAdmin && (
+                                    <Link
+                                        to="/admin"
+                                        className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+                                            isActive('/admin')
+                                                ? 'bg-amber-500/20 text-amber-600'
+                                                : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-50'
+                                        }`}
+                                    >
+                                        <Settings size={18} />
+                                        <span className="font-medium">Admin</span>
+                                    </Link>
+                                )}
                                 <Link
                                     to="/dashboard"
                                     className={`flex items-center space-x-2 px-5 py-2 rounded-full transition-all ${
@@ -171,6 +205,21 @@ export default function Navbar() {
                                     {link.name}
                                 </Link>
                             ))}
+
+                            {session && isAdmin && (
+                                <Link
+                                    to="/admin"
+                                    onClick={() => setIsOpen(false)}
+                                    className={`flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                                        isActive('/admin')
+                                            ? 'bg-amber-500/20 text-amber-600'
+                                            : 'text-foreground hover:bg-amber-50'
+                                    }`}
+                                >
+                                    <Settings size={18} />
+                                    Admin Panel
+                                </Link>
+                            )}
 
                             <div className="pt-4 border-t border-border/30 space-y-3">
                                 {session ? (

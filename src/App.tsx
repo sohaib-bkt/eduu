@@ -8,6 +8,9 @@ import Courses from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
 import Pricing from './pages/Pricing';
 import About from './pages/About';
+import AdminDashboard from './pages/AdminDashboard';
+import CourseEditor from './pages/CourseEditor';
+import AddLessonPage from './pages/AddLessonPage';
 
 function App() {
   return (
@@ -22,6 +25,9 @@ function App() {
           <Route path="course/:id" element={<CourseDetail />} />
           <Route path="pricing" element={<Pricing />} />
           <Route path="about" element={<About />} />
+          <Route path="admin" element={<AdminDashboard />} />
+          <Route path="admin/courses/:courseId" element={<CourseEditor />} />
+          <Route path="admin/modules/:moduleId/add-lesson" element={<AddLessonPage />} />
         </Route>
       </Routes>
     </Router>
