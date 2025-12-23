@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check, X, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -18,10 +19,12 @@ const item = {
 };
 
 export default function Pricing() {
+    const [billingMonthly, setBillingMonthly] = useState(true);
+
     const plans = [
         {
             name: 'Free',
-            price: '0',
+            monthly: 0,
             period: 'Forever',
             description: 'Perfect for exploring Edubloom',
             features: [
@@ -40,7 +43,7 @@ export default function Pricing() {
         },
         {
             name: 'Starter',
-            price: '9.99',
+            monthly: 9.99,
             period: 'per month',
             description: 'Great for focused learning',
             features: [
@@ -59,7 +62,7 @@ export default function Pricing() {
         },
         {
             name: 'Pro',
-            price: '24.99',
+            monthly: 24.99,
             period: 'per month',
             description: 'Best for serious learners',
             features: [
@@ -78,7 +81,7 @@ export default function Pricing() {
         },
         {
             name: 'Premium',
-            price: '49.99',
+            monthly: 49.99,
             period: 'per month',
             description: 'Complete learning experience',
             features: [
@@ -97,8 +100,17 @@ export default function Pricing() {
         },
     ];
 
+    const formatPrice = (monthly: number) => {
+        if (monthly === 0) return 'Free';
+        if (billingMonthly) return `$${monthly.toFixed(2)}`;
+        const annual = monthly * 12 * 0.8; // 20% off annual
+        return `$${annual.toFixed(2)}`;
+    };
+
+    const periodLabel = billingMonthly ? 'per month' : 'per year (billed annually)';
+
     return (
-        <div className="min-h-screen bg-gradient-to-b from-background via-background to-primary/5 pt-20">
+        <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-primary/5 pt-20">
             {/* Header */}
             <section className="py-16 sm:py-24">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -108,21 +120,25 @@ export default function Pricing() {
                         className="space-y-6"
                     >
                         <h1 className="text-5xl lg:text-6xl font-bold">
-                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-primary to-blue-600 dark:from-white dark:via-primary dark:to-blue-400">
+                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">
                                 Simple, Transparent Pricing
                             </span>
                         </h1>
-                        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                             Choose the perfect plan for your learning goals. Start free, upgrade anytime, cancel anytime.
                         </p>
 
                         {/* Billing Toggle */}
                         <div className="flex justify-center pt-4">
-                            <div className="inline-flex items-center gap-4 bg-secondary/50 p-1 rounded-full border border-border/30">
-                                <button className="px-6 py-2 rounded-full font-medium text-foreground bg-white dark:bg-gray-800 shadow-sm">
+                            <div className="inline-flex items-center gap-4 bg-secondary/20 p-1 rounded-full border border-border/30">
+                                <button
+                                    onClick={() => setBillingMonthly(true)}
+                                    className={`px-6 py-2 rounded-full font-medium transition-all ${billingMonthly ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-700 hover:bg-secondary/40'}`}>
                                     Monthly
                                 </button>
-                                <button className="px-6 py-2 rounded-full font-medium text-muted-foreground hover:text-foreground transition-colors">
+                                <button
+                                    onClick={() => setBillingMonthly(false)}
+                                    className={`px-6 py-2 rounded-full font-medium transition-all ${!billingMonthly ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-sm' : 'bg-transparent text-gray-700 hover:bg-secondary/40'}`}>
                                     Annual
                                     <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">Save 20%</span>
                                 </button>
@@ -167,8 +183,8 @@ export default function Pricing() {
                                         <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
                                         <p className="text-muted-foreground text-sm mb-6">{plan.description}</p>
                                         <div className="space-y-1">
-                                            <span className="text-5xl font-bold">${plan.price}</span>
-                                            <p className="text-muted-foreground text-sm">{plan.period}</p>
+                                            <span className="text-5xl font-bold text-primary">{formatPrice(plan.monthly)}</span>
+                                            <p className="text-gray-500 text-sm">{plan.monthly === 0 ? plan.period : periodLabel}</p>
                                         </div>
                                     </div>
 

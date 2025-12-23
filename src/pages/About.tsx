@@ -29,7 +29,7 @@ export default function About() {
                         className="space-y-6"
                     >
                         <h1 className="text-5xl lg:text-6xl font-bold">
-                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-primary to-blue-600 dark:from-white dark:via-primary dark:to-blue-400">
+                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">
                                 About Edubloom
                             </span>
                         </h1>

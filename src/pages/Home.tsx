@@ -21,7 +21,7 @@ export default function Home() {
     return (
         <div className="overflow-hidden bg-gradient-to-b from-background via-background to-primary/5">
             {/* Hero Section */}
-            <section className="relative pt-20 pb-40 lg:pt-40 lg:pb-56">
+            <section className="relative pt-10 pb-0 lg:pt-12 lg:pb-12">
                 <div className="absolute inset-0 -z-10 overflow-hidden">
                     <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/20 rounded-full blur-3xl" />
                     <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl" />
@@ -42,14 +42,14 @@ export default function Home() {
                                         ✨ Interactive Learning Platform
                                     </span>
                                 </div>
-                                <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight leading-tight">
-                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-primary to-blue-600 dark:from-white dark:via-primary dark:to-blue-400">
+                                <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight leading-tight">
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-500">
                                         Master University Courses
                                     </span>
                                     <br />
-                                    <span className="text-foreground">with AI-Powered Learning</span>
+                                    <span className="text-foreground/95">with AI-Powered Learning</span>
                                 </h1>
-                                <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">
+                                <p className="text-xl text-gray-500 leading-relaxed max-w-2xl">
                                     Animated videos, interactive quizzes, and personalized learning paths designed specifically for university students. Master complex subjects in half the time.
                                 </p>
                             </motion.div>
@@ -96,8 +96,37 @@ export default function Home() {
                             className="relative hidden lg:block"
                         >
                             <div className="relative w-full h-[500px]">
-                                {/* Gradient background for illustration area */}
+                                {/* Gradient background for illustration area with hero image and neon accents */}
                                 <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-blue-500/5 to-transparent rounded-2xl border border-border/50 overflow-hidden">
+                                    {/* Hero image */}
+                                    <img
+                                        src={"https://images.unsplash.com/photo-1668092548064-730e05fd0324?q=80&w=1167&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"}
+                                        alt="Students learning"
+                                        className="absolute inset-0 w-full h-full object-cover"
+                                    />
+
+                                    {/* Neon floating circles */}
+                                    <motion.div
+                                        animate={{ y: [0, -8, 0], scale: [1, 1.4, 1] }}
+                                        transition={{ duration: 3, repeat: Infinity }}
+                                        className="absolute left-8 top-28 w-3 h-3 rounded-full"
+                                        style={{ boxShadow: '0 0 18px rgba(14,165,233,0.85)', backgroundColor: 'rgba(56,189,248,0.95)' }}
+                                    />
+
+                                    <motion.div
+                                        animate={{ y: [0, -12, 0], x: [0, 6, 0], scale: [1, 1.6, 1] }}
+                                        transition={{ duration: 3.5, repeat: Infinity }}
+                                        className="absolute left-20 top-10 w-4 h-4 rounded-full"
+                                        style={{ boxShadow: '0 0 22px rgba(99,102,241,0.85)', backgroundColor: 'rgba(99,102,241,0.95)' }}
+                                    />
+
+                                    <motion.div
+                                        animate={{ y: [0, -6, 0], x: [0, -6, 0], scale: [1, 1.3, 1] }}
+                                        transition={{ duration: 2.8, repeat: Infinity }}
+                                        className="absolute right-36 bottom-32 w-5 h-5 rounded-full"
+                                        style={{ boxShadow: '0 0 24px rgba(168,85,247,0.9)', backgroundColor: 'rgba(168,85,247,0.95)' }}
+                                    />
+
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="text-center space-y-6 p-8">
                                             <div className="flex justify-center gap-4">
@@ -116,19 +145,16 @@ export default function Home() {
                                                     <CheckCircle2 className="w-10 h-10 text-white" />
                                                 </motion.div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <p className="font-semibold text-lg">Interactive Learning</p>
-                                                <p className="text-sm text-muted-foreground">Real-time feedback and progress tracking</p>
-                                            </div>
+                                            
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 {/* Floating cards */}
                                 <motion.div
                                     animate={{ y: [0, 20, 0] }}
                                     transition={{ duration: 4, repeat: Infinity }}
-                                    className="absolute -bottom-12 -right-12 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg border border-border"
+                                    className="absolute -bottom-12 -right-12 bg-white dark:bg-blue-50 p-4 rounded-xl shadow-lg border border-border"
                                 >
                                     <p className="text-sm font-semibold">📈 95% Pass Rate</p>
                                 </motion.div>
