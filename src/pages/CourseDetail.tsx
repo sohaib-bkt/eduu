@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, PlayCircle, BookOpen, Clock, Award, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -17,7 +17,9 @@ interface Lesson {
   title: string;
   duration: number;
   is_free: boolean;
-  video_url: string;
+  video_url?: string | null;
+  audio_url?: string | null;
+  pdf_url?: string | null;
 }
 
 interface CourseDetail {
@@ -37,6 +39,7 @@ export default function CourseDetail() {
   const [loading, setLoading] = useState(true);
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [resolvedMedia, setResolvedMedia] = useState<Record<string, { video?: string; audio?: string; pdf?: string }>>({});
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -62,6 +65,83 @@ export default function CourseDetail() {
 
     fetchCourse();
   }, [id]);
+
+  // Resolve media URLs (public or signed) for lessons
+  useEffect(() => {
+    if (!course) return;
+
+    let mounted = true;
+
+    const tryParseBucketAndPath = (u: string) => {
+      try {
+        const parsedUrl = new URL(u);
+        const m = parsedUrl.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/);
+        if (m) return { bucket: m[1], path: decodeURIComponent(m[2]) };
+      } catch (e) {
+        // not a full URL
+      }
+      const parts = u.split('/');
+      if (parts.length > 1 && ['videos', 'audios', 'pdfs'].includes(parts[0])) {
+        return { bucket: parts[0], path: parts.slice(1).join('/') };
+      }
+      return { bucket: null as null, path: u };
+    };
+
+    const resolveForLesson = async (lesson: Lesson) => {
+      const result: { video?: string; audio?: string; pdf?: string } = {};
+
+      if (lesson.video_url) {
+        const parsed = tryParseBucketAndPath(lesson.video_url as string);
+        if (parsed.bucket) {
+          const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
+          result.video = pub?.publicUrl || null;
+        } else {
+          result.video = lesson.video_url as string;
+        }
+      }
+
+      if (lesson.audio_url) {
+        const parsed = tryParseBucketAndPath(lesson.audio_url as string);
+        if (parsed.bucket) {
+          const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
+          result.audio = pub?.publicUrl || null;
+        } else {
+          result.audio = lesson.audio_url as string;
+        }
+      }
+
+      if (lesson.pdf_url) {
+        const parsed = tryParseBucketAndPath(lesson.pdf_url as string);
+        if (parsed.bucket) {
+          const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
+          result.pdf = pub?.publicUrl || null;
+        } else {
+          result.pdf = lesson.pdf_url as string;
+        }
+      }
+
+      return result;
+    };
+
+    (async () => {
+      const map: Record<string, { video?: string; audio?: string; pdf?: string }> = {};
+      for (const module of course.modules) {
+        for (const lesson of module.lessons) {
+          try {
+            map[lesson.id] = await resolveForLesson(lesson);
+          } catch (e) {
+            map[lesson.id] = {};
+          }
+        }
+      }
+
+      if (mounted) setResolvedMedia(map);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [course]);
 
   if (loading) {
     return (
@@ -249,10 +329,15 @@ export default function CourseDetail() {
                                   )}
                                 </div>
                               </div>
-                              {user ? (
-                                <button className="px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors text-sm font-medium">
-                                  Watch
-                                </button>
+                              {user || lesson.is_free ? (
+                                <div className="flex items-center gap-3">
+                                  <Link
+                                    to={`/lesson/${lesson.id}`}
+                                    className="text-primary font-medium hover:underline"
+                                  >
+                                    View Lesson
+                                  </Link>
+                                </div>
                               ) : (
                                 <button
                                   onClick={() => navigate('/login')}
