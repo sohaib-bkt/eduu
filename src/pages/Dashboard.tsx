@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, Trophy, Target, Zap, Bell, MessageSquare } from 'lucide-react';
+import { BookOpen, Trophy, Target, Zap, Bell, MessageSquare, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getDashboardStats, getUserNotifications, getUserEnrollments } from '../lib/api';
-import { Link } from 'react-router-dom';
+import { getDashboardStats, getUserNotifications, getUserEnrollments, getAllCourseProgress } from '../lib/api';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface DashboardStats {
   totalCourses: number;
@@ -31,10 +31,12 @@ interface CourseEnrollment {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
+  const [progressMap, setProgressMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,6 +56,12 @@ export default function Dashboard() {
           setStats(statsData);
           setNotifications(notificationsData.slice(0, 5));
           setEnrollments(enrollmentsData);
+
+          // Fetch real progress for all courses
+          if (enrollmentsData && enrollmentsData.length > 0) {
+            const progress = await getAllCourseProgress(userId, enrollmentsData);
+            setProgressMap(progress);
+          }
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -91,37 +99,46 @@ export default function Dashboard() {
         </motion.div>
 
         {/* Stats Grid */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {[{
             icon: <BookOpen className="h-6 w-6 text-white" />,
-            label: 'Enrolled',
+            label: 'Enrolled Courses',
             value: stats?.totalCourses || 0,
-            accent: 'from-blue-500 to-cyan-400'
+            accent: 'from-blue-500 to-cyan-400',
+            bgLight: 'bg-blue-50'
           }, {
             icon: <Trophy className="h-6 w-6 text-white" />,
             label: 'Quizzes Passed',
             value: stats?.completedQuizzes || 0,
-            accent: 'from-yellow-400 to-amber-400'
+            accent: 'from-yellow-400 to-amber-400',
+            bgLight: 'bg-yellow-50'
           }, {
             icon: <Target className="h-6 w-6 text-white" />,
-            label: 'Avg Score',
+            label: 'Average Score',
             value: `${stats?.averageScore || 0}%`,
-            accent: 'from-green-400 to-emerald-400'
+            accent: 'from-green-400 to-emerald-400',
+            bgLight: 'bg-green-50'
           }, {
             icon: <Zap className="h-6 w-6 text-white" />,
-            label: 'Plan',
+            label: 'Subscription',
             value: stats?.subscription ? stats.subscription.toUpperCase() : 'FREE',
-            accent: 'from-purple-500 to-pink-500'
+            accent: 'from-purple-500 to-pink-500',
+            bgLight: 'bg-purple-50'
           }].map((s, idx) => (
-            <motion.div key={idx} whileHover={{ translateY: -6 }} className="bg-white rounded-xl p-5 border border-border/30 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className={`h-12 w-12 rounded-lg bg-gradient-to-br ${s.accent} flex items-center justify-center shadow-md`}>
+            <motion.div
+              key={idx}
+              whileHover={{ translateY: -8, boxShadow: '0 20px 25px rgba(0,0,0,0.1)' }}
+              transition={{ type: 'spring', stiffness: 300 }}
+              className={`${s.bgLight} rounded-2xl p-6 border border-border/30 shadow-sm hover:shadow-lg transition-shadow`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${s.accent} flex items-center justify-center shadow-md`}>
                   {s.icon}
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">{s.label}</p>
-                  <p className="text-2xl font-bold mt-1">{s.value}</p>
-                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-1">{s.label}</p>
+                <p className="text-3xl font-bold text-gray-900">{s.value}</p>
               </div>
             </motion.div>
           ))}
@@ -160,29 +177,46 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {enrollments.slice(0, 4).map((enrollment) => (
-                    <motion.div key={enrollment.course_id} whileHover={{ scale: 1.03 }} className="bg-white rounded-lg overflow-hidden border border-border/30 hover:shadow-md transition-all cursor-pointer">
-                      <div className="aspect-video bg-gradient-to-br from-primary/10 to-transparent flex items-end p-3">
-                        {enrollment.courses.thumbnail_url ? (
-                          <img src={enrollment.courses.thumbnail_url} alt={enrollment.courses.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex items-center justify-center w-full h-full">
-                            <BookOpen className="h-10 w-10 text-primary/40" />
+                  {enrollments.slice(0, 4).map((enrollment) => {
+                    const progress = progressMap[enrollment.course_id] || 0;
+                    return (
+                      <motion.div
+                        key={enrollment.course_id}
+                        whileHover={{ scale: 1.03 }}
+                        onClick={() => navigate(`/course/${enrollment.course_id}`)}
+                        className="bg-white rounded-lg overflow-hidden border border-border/30 hover:shadow-md transition-all cursor-pointer group relative"
+                      >
+                        <div className="aspect-video bg-gradient-to-br from-primary/10 to-transparent flex items-end p-3 relative">
+                          {enrollment.courses.thumbnail_url ? (
+                            <img src={enrollment.courses.thumbnail_url} alt={enrollment.courses.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full">
+                              <BookOpen className="h-10 w-10 text-primary/40" />
+                            </div>
+                          )}
+                          {/* Overlay on hover */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                            <ArrowRight className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
-                        )}
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-sm line-clamp-2">{enrollment.courses.title}</h3>
-                        <p className="text-xs text-gray-500 mt-2">{enrollment.courses.category}</p>
-                        <div className="mt-3">
-                          <div className="w-full bg-slate-100 rounded-full h-2">
-                            <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(100, Math.floor(Math.random() * 70) + 10)}%` }} />
-                          </div>
-                          <div className="text-xs text-gray-500 mt-2">Progress: <span className="font-medium text-gray-700">{`${Math.floor(Math.random() * 70) + 10}%`}</span></div>
                         </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                        <div className="p-4">
+                          <h3 className="font-semibold text-sm line-clamp-2">{enrollment.courses.title}</h3>
+                          <p className="text-xs text-gray-500 mt-2">{enrollment.courses.category}</p>
+                          <div className="mt-3">
+                            <div className="w-full bg-slate-100 rounded-full h-2">
+                              <motion.div
+                                className="bg-gradient-to-r from-primary to-blue-600 h-2 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${progress}%` }}
+                                transition={{ duration: 0.5 }}
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500 mt-2">Progress: <span className="font-medium text-gray-700">{progress}%</span></div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               )}
             </div>

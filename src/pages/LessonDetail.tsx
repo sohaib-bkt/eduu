@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import { getLessonById, getQuizzesByLesson } from '../lib/api';
-import { ArrowLeft, BookOpen, Clock } from 'lucide-react';
+import { getLessonById } from '../lib/api';
+import { ArrowLeft, BookOpen, Clock, HelpCircle } from 'lucide-react';
+import VideoPlayer from '../components/VideoPlayer';
 
 interface Lesson {
   id: string;
@@ -134,7 +135,7 @@ export default function LessonDetail() {
           {canView && (
             <div className="space-y-6">
               {media.video && (
-                <video controls src={media.video} className="w-full rounded-lg max-h-[640px] object-contain" />
+                <VideoPlayer src={media.video} title={lesson.title} />
               )}
 
               {media.audio && (
@@ -151,7 +152,22 @@ export default function LessonDetail() {
                 <div className="p-6 bg-muted/10 rounded-lg">No media available for this lesson.</div>
               )}
 
-              {/* TODO: quizzes, resources, notes */}
+              {/* Quiz Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-8 pt-8 border-t border-border/30"
+              >
+                <button
+                  onClick={() => navigate(`/quiz/${id}`)}
+                  className="w-full px-6 py-4 bg-gradient-to-r from-primary to-primary/80 text-white rounded-lg hover:shadow-lg transition-shadow font-semibold flex items-center justify-center gap-2"
+                >
+                  <HelpCircle className="h-5 w-5" />
+                  Take Quiz
+                </button>
+              </motion.div>
+
+              {/* TODO: resources, notes */}
             </div>
           )}
         </div>

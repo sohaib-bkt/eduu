@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Filter, Users, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getCourses, enrollCourse } from '../lib/api';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface Course {
   id: string;
@@ -27,6 +27,7 @@ export default function Courses() {
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [enrolling, setEnrolling] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -226,7 +227,8 @@ export default function Courses() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
                 whileHover={{ translateY: -8 }}
-                className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/course/${course.id}`)}
+                className="bg-card rounded-2xl border border-border/50 overflow-hidden shadow-sm hover:shadow-lg transition-shadow cursor-pointer"
               >
                 {/* Course Thumbnail */}
                 <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden relative">

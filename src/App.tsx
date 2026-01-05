@@ -12,6 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import CourseEditor from './pages/CourseEditor';
 import AddLessonPage from './pages/AddLessonPage';
 import LessonDetail from './pages/LessonDetail';
+import QuizDetail from './pages/QuizDetail';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="admin/courses/:courseId" element={<CourseEditor />} />
           <Route path="admin/modules/:moduleId/add-lesson" element={<AddLessonPage />} />
           <Route path="lesson/:id" element={<LessonDetail />} />
+          <Route path="quiz/:lessonId" element={<QuizDetail />} />
         </Route>
       </Routes>
     </Router>

@@ -196,3 +196,83 @@ export async function getDashboardStats(userId: string) {
     subscription: subscription?.plan_type || 'free',
   };
 }
+
+// Calculate course progress based on quizzes completed
+export async function getCourseProgress(userId: string, courseId: string) {
+  try {
+    // Get course with all modules and lessons
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('*, modules(*, lessons(*))')
+      .eq('id', courseId)
+      .single();
+    
+    if (courseError) throw courseError;
+
+    if (!course?.modules || course.modules.length === 0) {
+      return 0;
+    }
+
+    // Count total lessons
+    let totalLessons = 0;
+    course.modules.forEach((module: any) => {
+      if (module.lessons) {
+        totalLessons += module.lessons.length;
+      }
+    });
+
+    if (totalLessons === 0) {
+      return 0;
+    }
+
+    // Get user's quiz submissions for lessons in this course
+    const { data: submissions, error: submissionError } = await supabase
+      .from('quiz_submissions')
+      .select('*, quizzes(lesson_id)')
+      .eq('user_id', userId);
+
+    if (submissionError) throw submissionError;
+
+    // Get all lesson IDs in this course
+    const lessonIds = new Set<string>();
+    course.modules.forEach((module: any) => {
+      if (module.lessons) {
+        module.lessons.forEach((lesson: any) => {
+          lessonIds.add(lesson.id);
+        });
+      }
+    });
+
+    // Count completed lessons (lessons with passed quizzes)
+    const completedLessonIds = new Set<string>();
+    submissions?.forEach((sub: any) => {
+      if (sub.passed && sub.quizzes?.lesson_id && lessonIds.has(sub.quizzes.lesson_id)) {
+        completedLessonIds.add(sub.quizzes.lesson_id);
+      }
+    });
+
+    const progress = Math.round((completedLessonIds.size / totalLessons) * 100);
+    return Math.min(100, progress);
+  } catch (error) {
+    console.error('Error calculating course progress:', error);
+    return 0;
+  }
+}
+
+// Get progress for all courses
+export async function getAllCourseProgress(userId: string, enrollments: any[]) {
+  try {
+    const progressMap: Record<string, number> = {};
+    
+    for (const enrollment of enrollments) {
+      const progress = await getCourseProgress(userId, enrollment.course_id);
+      progressMap[enrollment.course_id] = progress;
+    }
+    
+    return progressMap;
+  } catch (error) {
+    console.error('Error fetching all course progress:', error);
+    return {};
+  }
+}
+
