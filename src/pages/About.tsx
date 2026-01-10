@@ -156,7 +156,7 @@ export default function About() {
                                 avatar: '👩‍🎓'
                             },
                             {
-                                name: 'James Wilson',
+                                name: 'James Wilsons',
                                 role: 'VP of Operations',
                                 bio: 'EdTech industry veteran, scaling products globally',
                                 avatar: '👨‍💼'
