@@ -179,7 +179,7 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2"> 
+          <div className="flex items-center gap-2">  
             {/* Playback Speed */}
             <div className="flex items-center gap-1">
               {[0.5, 1, 1.5, 2].map((rate) => (
