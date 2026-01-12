@@ -195,7 +195,7 @@ export default function VideoPlayer({ src, title }: VideoPlayerProps) {
                   {rate}x
                 </button>
               ))}
-            </div>
+            </div> 
 
             {/* Fullscreen */}
             <button
