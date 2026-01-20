@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
-import { getSupportMessages, createSupportReply, updateMessageStatus } from '../lib/api';
+import { getSupportMessages, getSupportMessageById, createSupportReply, updateMessageStatus } from '../lib/api';
 
 interface Message {
   id: string;
@@ -20,10 +20,7 @@ interface Message {
     id: string;
     reply_text: string;
     created_at: string;
-    profiles?: {
-      full_name: string;
-      avatar_url?: string;
-    };
+    admin_id?: string;
   }>;
 }
 
@@ -48,7 +45,9 @@ export default function AdminSupport({ adminId }: AdminSupportProps) {
   const fetchMessages = async () => {
     try {
       const data = await getSupportMessages();
-      setMessages(data || []);
+      if (data) {
+        setMessages(data || []);
+      }
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -65,11 +64,11 @@ export default function AdminSupport({ adminId }: AdminSupportProps) {
       await createSupportReply(selectedMessage.id, adminId, replyText);
       setReplyText('');
       
-      // Refresh messages and update selected message
+      // Refresh messages 
       await fetchMessages();
       
-      // Re-select the message to see the new reply
-      const updatedMessage = messages.find(m => m.id === selectedMessage.id);
+      // Re-fetch the message to get the new reply
+      const updatedMessage = await getSupportMessageById(selectedMessage.id);
       if (updatedMessage) {
         setSelectedMessage(updatedMessage);
       }
@@ -254,7 +253,7 @@ export default function AdminSupport({ adminId }: AdminSupportProps) {
                     <div key={reply.id} className="bg-white p-3 rounded-lg border border-gray-200">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm font-medium text-gray-900">
-                          {reply.profiles?.full_name || 'Admin'}
+                          Admin
                         </p>
                         <p className="text-xs text-gray-500">
                           {new Date(reply.created_at).toLocaleString()}

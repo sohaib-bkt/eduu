@@ -14,10 +14,7 @@ interface Message {
     id: string;
     reply_text: string;
     created_at: string;
-    profiles?: {
-      full_name: string;
-      avatar_url?: string;
-    };
+    admin_id?: string;
   }>;
 }
 
@@ -167,20 +164,12 @@ export default function MySupportMessages() {
                           {message.support_replies.map(reply => (
                             <div key={reply.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                               <div className="flex items-start gap-3 mb-2">
-                                {reply.profiles?.avatar_url ? (
-                                  <img
-                                    src={reply.profiles.avatar_url}
-                                    alt="Admin"
-                                    className="w-8 h-8 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                                    A
-                                  </div>
-                                )}
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                                  A
+                                </div>
                                 <div className="flex-1">
                                   <p className="font-semibold text-gray-900">
-                                    {reply.profiles?.full_name || 'Admin'}
+                                    Admin
                                   </p>
                                   <p className="text-xs text-gray-600">
                                     {new Date(reply.created_at).toLocaleDateString('en-US', {

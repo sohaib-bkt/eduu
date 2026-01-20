@@ -295,40 +295,106 @@ export async function createSupportMessage(userId: string, title: string, conten
 }
 
 export async function getSupportMessages(filters?: { status?: string; adminId?: string }) {
-  let query = supabase
-    .from('messages')
-    .select('*, profiles:user_id(full_name, email, avatar_url)');
+  try {
+    let query = supabase
+      .from('messages')
+      .select('*, profiles:user_id(full_name, email, avatar_url)');
 
-  if (filters?.status) {
-    query = query.eq('status', filters.status);
+    if (filters?.status) {
+      query = query.eq('status', filters.status);
+    }
+
+    const { data: messages, error } = await query.order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Get all replies for these messages
+    const messageIds = messages?.map(m => m.id) || [];
+    if (messageIds.length === 0) return messages;
+
+    const { data: replies, error: repliesError } = await supabase
+      .from('support_replies')
+      .select('*')
+      .in('message_id', messageIds);
+
+    if (repliesError) throw repliesError;
+
+    // Combine messages with their replies
+    const messagesWithReplies = messages?.map(msg => ({
+      ...msg,
+      support_replies: replies?.filter(r => r.message_id === msg.id) || []
+    })) || [];
+
+    return messagesWithReplies;
+  } catch (error) {
+    console.error('Error fetching support messages:', error);
+    throw error;
   }
-
-  const { data, error } = await query.order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data;
 }
 
 export async function getUserSupportMessages(userId: string) {
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*, support_replies(*, profiles:admin_id(full_name, avatar_url))')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  try {
+    // First get the messages
+    const { data: messages, error: messagesError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data;
+    if (messagesError) throw messagesError;
+
+    // Then get all replies for these messages
+    const messageIds = messages?.map(m => m.id) || [];
+    if (messageIds.length === 0) return messages;
+
+    const { data: replies, error: repliesError } = await supabase
+      .from('support_replies')
+      .select('*')
+      .in('message_id', messageIds);
+
+    if (repliesError) throw repliesError;
+
+    // Combine messages with their replies
+    const messagesWithReplies = messages?.map(msg => ({
+      ...msg,
+      support_replies: replies?.filter(r => r.message_id === msg.id) || []
+    })) || [];
+
+    return messagesWithReplies;
+  } catch (error) {
+    console.error('Error fetching user support messages:', error);
+    throw error;
+  }
 }
 
 export async function getSupportMessageById(messageId: string) {
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*, support_replies(*, profiles:admin_id(full_name, avatar_url)), profiles:user_id(full_name, email)')
-    .eq('id', messageId)
-    .single();
+  try {
+    // Get the message
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('id', messageId)
+      .single();
 
-  if (error) throw error;
-  return data;
+    if (messageError) throw messageError;
+
+    // Get replies for this message
+    const { data: replies, error: repliesError } = await supabase
+      .from('support_replies')
+      .select('*')
+      .eq('message_id', messageId);
+
+    if (repliesError) throw repliesError;
+
+    // Combine
+    return {
+      ...message,
+      support_replies: replies || []
+    };
+  } catch (error) {
+    console.error('Error fetching support message:', error);
+    throw error;
+  }
 }
 
 export async function createSupportReply(messageId: string, adminId: string, replyText: string) {
