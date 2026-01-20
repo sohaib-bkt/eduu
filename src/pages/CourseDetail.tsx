@@ -39,7 +39,6 @@ export default function CourseDetail() {
   const [loading, setLoading] = useState(true);
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
-  const [resolvedMedia, setResolvedMedia] = useState<Record<string, { video?: string; audio?: string; pdf?: string }>>({});
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -70,8 +69,6 @@ export default function CourseDetail() {
   useEffect(() => {
     if (!course) return;
 
-    let mounted = true;
-
     const tryParseBucketAndPath = (u: string) => {
       try {
         const parsedUrl = new URL(u);
@@ -94,7 +91,7 @@ export default function CourseDetail() {
         const parsed = tryParseBucketAndPath(lesson.video_url as string);
         if (parsed.bucket) {
           const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
-          result.video = pub?.publicUrl || null;
+          result.video = pub?.publicUrl || undefined;
         } else {
           result.video = lesson.video_url as string;
         }
@@ -104,7 +101,7 @@ export default function CourseDetail() {
         const parsed = tryParseBucketAndPath(lesson.audio_url as string);
         if (parsed.bucket) {
           const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
-          result.audio = pub?.publicUrl || null;
+          result.audio = pub?.publicUrl || undefined;
         } else {
           result.audio = lesson.audio_url as string;
         }
@@ -114,7 +111,7 @@ export default function CourseDetail() {
         const parsed = tryParseBucketAndPath(lesson.pdf_url as string);
         if (parsed.bucket) {
           const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
-          result.pdf = pub?.publicUrl || null;
+          result.pdf = pub?.publicUrl || undefined;
         } else {
           result.pdf = lesson.pdf_url as string;
         }
@@ -135,12 +132,8 @@ export default function CourseDetail() {
         }
       }
 
-      if (mounted) setResolvedMedia(map);
+      // Resolved media is not needed for display
     })();
-
-    return () => {
-      mounted = false;
-    };
   }, [course]);
 
   if (loading) {

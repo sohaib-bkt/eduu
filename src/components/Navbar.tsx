@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, BookOpen, User, LogOut, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import NotificationCenter from './NotificationCenter';
 
 import type { Session } from '@supabase/supabase-js';
 
@@ -114,6 +115,7 @@ export default function Navbar() {
                     <div className="hidden md:flex items-center space-x-4">
                         {session ? (
                             <div className="flex items-center space-x-4">
+                                <NotificationCenter userId={session.user.id} />
                                 {isAdmin && (
                                     <Link
                                         to="/admin"

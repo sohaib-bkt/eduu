@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit2, Trash2, BookOpen, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, BookOpen, AlertCircle, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Link } from 'react-router-dom';
+import AdminSupport from '../components/AdminSupport';
 
 interface Course {
   id: string;
@@ -39,6 +40,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [activeTab, setActiveTab] = useState<'courses' | 'support'>('courses');
 
   useEffect(() => {
     checkAdminAccess();
@@ -202,6 +204,35 @@ export default function AdminDashboard() {
           </motion.div>
         )}
 
+        {/* Navigation Tabs */}
+        <div className="mb-8 flex gap-4 border-b border-border/20">
+          <button
+            onClick={() => setActiveTab('courses')}
+            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+              activeTab === 'courses'
+                ? 'text-primary border-primary'
+                : 'text-gray-600 border-transparent hover:text-gray-900'
+            }`}
+          >
+            <BookOpen className="w-5 h-5 inline mr-2" />
+            Courses
+          </button>
+          <button
+            onClick={() => setActiveTab('support')}
+            className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
+              activeTab === 'support'
+                ? 'text-primary border-primary'
+                : 'text-gray-600 border-transparent hover:text-gray-900'
+            }`}
+          >
+            <MessageSquare className="w-5 h-5 inline mr-2" />
+            Support Messages
+          </button>
+        </div>
+
+        {/* Content Based on Active Tab */}
+        {activeTab === 'courses' && (
+          <>
         {/* Course Form */}
         {showForm && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-white rounded-xl p-8 border border-border/30 shadow-sm">
@@ -361,6 +392,15 @@ export default function AdminDashboard() {
             )}
           </div>
         </motion.div>
+          </>
+        )}
+
+        {/* Support Tab */}
+        {activeTab === 'support' && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <AdminSupport adminId={user?.id} />
+          </motion.div>
+        )}
       </div>
     </div>
   );

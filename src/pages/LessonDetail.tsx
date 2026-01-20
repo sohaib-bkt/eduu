@@ -62,7 +62,7 @@ export default function LessonDetail() {
           const parsed = tryParseBucketAndPath(data.video_url as string);
           if (parsed.bucket) {
             const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
-            resolved.video = pub?.publicUrl || null;
+            resolved.video = pub?.publicUrl || undefined;
           } else {
             resolved.video = data.video_url as string;
           }
@@ -72,7 +72,7 @@ export default function LessonDetail() {
           const parsed = tryParseBucketAndPath(data.audio_url as string);
           if (parsed.bucket) {
             const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
-            resolved.audio = pub?.publicUrl || null;
+            resolved.audio = pub?.publicUrl || undefined;
           } else {
             resolved.audio = data.audio_url as string;
           }
@@ -82,7 +82,7 @@ export default function LessonDetail() {
           const parsed = tryParseBucketAndPath(data.pdf_url as string);
           if (parsed.bucket) {
             const { data: pub } = supabase.storage.from(parsed.bucket).getPublicUrl(parsed.path);
-            resolved.pdf = pub?.publicUrl || null;
+            resolved.pdf = pub?.publicUrl || undefined;
           } else {
             resolved.pdf = data.pdf_url as string;
           }

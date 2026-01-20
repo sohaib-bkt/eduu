@@ -4,6 +4,7 @@ import { BookOpen, Trophy, Target, Zap, Bell, MessageSquare, ArrowRight } from '
 import { supabase } from '../lib/supabase';
 import { getDashboardStats, getUserNotifications, getUserEnrollments, getAllCourseProgress } from '../lib/api';
 import { Link, useNavigate } from 'react-router-dom';
+import ContactAdminForm from '../components/ContactAdminForm';
 
 interface DashboardStats {
   totalCourses: number;
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [enrollments, setEnrollments] = useState<CourseEnrollment[]>([]);
   const [progressMap, setProgressMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [contactFormOpen, setContactFormOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -264,7 +266,7 @@ export default function Dashboard() {
                   <BookOpen className="h-5 w-5 text-primary" />
                   <span className="text-sm font-medium">Browse Courses</span>
                 </Link>
-                <button className="w-full flex items-center gap-3 p-3 rounded-lg bg-primary text-white transition-all hover:opacity-95">
+                <button onClick={() => setContactFormOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-lg bg-primary text-white transition-all hover:opacity-95">
                   <MessageSquare className="h-5 w-5 text-white" />
                   <span className="text-sm font-medium">Get Help</span>
                 </button>
@@ -273,6 +275,13 @@ export default function Dashboard() {
           </motion.div>
         </div>
       </div>
+
+      {/* Contact Admin Form Modal */}
+      <ContactAdminForm 
+        isOpen={contactFormOpen}
+        onClose={() => setContactFormOpen(false)}
+        userId={user?.id}
+      />
     </div>
   );
 }

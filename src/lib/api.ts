@@ -276,3 +276,126 @@ export async function getAllCourseProgress(userId: string, enrollments: any[]) {
   }
 }
 
+// Support Messages & Notifications
+export async function createSupportMessage(userId: string, title: string, content: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert([
+      {
+        user_id: userId,
+        title,
+        content,
+        status: 'open',
+      },
+    ])
+    .select();
+
+  if (error) throw error;
+  return data?.[0];
+}
+
+export async function getSupportMessages(filters?: { status?: string; adminId?: string }) {
+  let query = supabase
+    .from('messages')
+    .select('*, profiles:user_id(full_name, email, avatar_url)');
+
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getUserSupportMessages(userId: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*, support_replies(*, profiles:admin_id(full_name, avatar_url))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getSupportMessageById(messageId: string) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*, support_replies(*, profiles:admin_id(full_name, avatar_url)), profiles:user_id(full_name, email)')
+    .eq('id', messageId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createSupportReply(messageId: string, adminId: string, replyText: string) {
+  // Create the reply
+  const { data: replyData, error: replyError } = await supabase
+    .from('support_replies')
+    .insert([
+      {
+        message_id: messageId,
+        admin_id: adminId,
+        reply_text: replyText,
+      },
+    ])
+    .select();
+
+  if (replyError) throw replyError;
+
+  // Get the message to find the user
+  const { data: messageData, error: messageError } = await supabase
+    .from('messages')
+    .select('user_id')
+    .eq('id', messageId)
+    .single();
+
+  if (messageError) throw messageError;
+
+  // Create a notification for the user
+  const { error: notificationError } = await supabase
+    .from('notifications')
+    .insert([
+      {
+        user_id: messageData.user_id,
+        title: 'Admin Response to Your Support Request',
+        message: replyText,
+        read: false,
+      },
+    ]);
+
+  if (notificationError) throw notificationError;
+
+  // Update message status to in_progress
+  await supabase
+    .from('messages')
+    .update({ status: 'in_progress', admin_id: adminId })
+    .eq('id', messageId);
+
+  return replyData?.[0];
+}
+
+export async function updateMessageStatus(messageId: string, status: 'open' | 'in_progress' | 'resolved') {
+  const { data, error } = await supabase
+    .from('messages')
+    .update({ status })
+    .eq('id', messageId)
+    .select();
+
+  if (error) throw error;
+  return data?.[0];
+}
+
+export async function getNotifications(userId: string) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
