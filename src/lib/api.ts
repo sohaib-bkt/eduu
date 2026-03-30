@@ -14,7 +14,7 @@ export async function getUserProfile(userId: string) {
 // Courses
 export async function getCourses(filters?: { category?: string; difficulty?: string; search?: string }) {
   let query = supabase.from('courses').select('*');
-  
+
   if (filters?.category) {
     query = query.eq('category', filters.category);
   }
@@ -88,6 +88,16 @@ export async function getLessonById(id: string) {
   return data;
 }
 
+export async function updateLessonSummary(lessonId: string, summary: string) {
+  const { data, error } = await supabase
+    .from('lessons')
+    .update({ content: summary }) // Reusing content column for summary for now if summary column isn't added yet
+    .eq('id', lessonId)
+    .select();
+  if (error) throw error;
+  return data?.[0];
+}
+
 // Quizzes
 export async function getQuizzesByLesson(lessonId: string) {
   const { data, error } = await supabase
@@ -96,6 +106,54 @@ export async function getQuizzesByLesson(lessonId: string) {
     .eq('lesson_id', lessonId);
   if (error) throw error;
   return data;
+}
+
+export async function createQuizFromAI(lessonId: string, quizData: any) {
+  // 1. Create the quiz
+  const { data: quiz, error: quizError } = await supabase
+    .from('quizzes')
+    .insert([{
+      lesson_id: lessonId,
+      title: quizData.title,
+      description: quizData.description,
+      passing_score: 70
+    }])
+    .select()
+    .single();
+
+  if (quizError) throw quizError;
+
+  // 2. Create questions and options
+  for (let i = 0; i < quizData.questions.length; i++) {
+    const q = quizData.questions[i];
+    const { data: question, error: qError } = await supabase
+      .from('quiz_questions')
+      .insert([{
+        quiz_id: quiz.id,
+        question_text: q.question_text,
+        question_type: 'multiple_choice',
+        order_index: i
+      }])
+      .select()
+      .single();
+
+    if (qError) throw qError;
+
+    const options = q.options.map((opt: any, idx: number) => ({
+      question_id: question.id,
+      option_text: opt.text,
+      is_correct: opt.is_correct,
+      order_index: idx
+    }));
+
+    const { error: optError } = await supabase
+      .from('quiz_options')
+      .insert(options);
+
+    if (optError) throw optError;
+  }
+
+  return quiz;
 }
 
 export async function submitQuiz(quizId: string, userId: string, score: number, passed: boolean) {
@@ -131,6 +189,52 @@ export async function getUserSubscription(userId: string) {
     .single();
   if (error && error.code !== 'PGRST116') throw error;
   return data || null;
+}
+
+export async function createSubscription(userId: string, planType: string) {
+  // Cancel any existing active subscription first
+  const { error: cancelError } = await supabase
+    .from('subscriptions')
+    .update({ status: 'canceled', end_date: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  if (cancelError) throw cancelError;
+
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .insert({
+      user_id: userId,
+      plan_type: planType.toLowerCase(),
+      status: 'active',
+      start_date: new Date().toISOString(),
+    })
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function cancelSubscription(userId: string) {
+  const { error } = await supabase
+    .from('subscriptions')
+    .update({ status: 'canceled', end_date: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  if (error) throw error;
+  return true;
+}
+
+export async function getSubscriptionHistory(userId: string) {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
 }
 
 // Notifications
@@ -206,7 +310,7 @@ export async function getCourseProgress(userId: string, courseId: string) {
       .select('*, modules(*, lessons(*))')
       .eq('id', courseId)
       .single();
-    
+
     if (courseError) throw courseError;
 
     if (!course?.modules || course.modules.length === 0) {
@@ -263,12 +367,12 @@ export async function getCourseProgress(userId: string, courseId: string) {
 export async function getAllCourseProgress(userId: string, enrollments: any[]) {
   try {
     const progressMap: Record<string, number> = {};
-    
+
     for (const enrollment of enrollments) {
       const progress = await getCourseProgress(userId, enrollment.course_id);
       progressMap[enrollment.course_id] = progress;
     }
-    
+
     return progressMap;
   } catch (error) {
     console.error('Error fetching all course progress:', error);

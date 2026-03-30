@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BookOpen, Trophy, Target, Zap, Bell, MessageSquare, ArrowRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getDashboardStats, getUserNotifications, getUserEnrollments, getAllCourseProgress } from '../lib/api';
+import { createSubscription, getDashboardStats, getUserNotifications, getUserEnrollments, getAllCourseProgress } from '../lib/api';
 import { Link, useNavigate } from 'react-router-dom';
 import ContactAdminForm from '../components/ContactAdminForm';
 
@@ -49,6 +49,23 @@ export default function Dashboard() {
           const userId = sessionData.session.user.id;
           setUser(sessionData.session.user);
 
+          const params = new URLSearchParams(window.location.search);
+          const checkoutSuccess = params.get('checkout') === 'success';
+          const plan = params.get('plan') || localStorage.getItem('eduu_pending_plan');
+
+          if (checkoutSuccess || plan) {
+            const subscriptionPlan = plan as string;
+            if (subscriptionPlan) {
+              try {
+                await createSubscription(userId, subscriptionPlan);
+                localStorage.removeItem('eduu_pending_plan');
+                window.history.replaceState({}, document.title, window.location.pathname);
+              } catch (error) {
+                console.error('Error creating subscription after checkout:', error);
+              }
+            }
+          }
+
           const [statsData, notificationsData, enrollmentsData] = await Promise.all([
             getDashboardStats(userId),
             getUserNotifications(userId),
@@ -93,8 +110,7 @@ export default function Dashboard() {
               <h1 className="text-3xl md:text-4xl font-extrabold mb-1">Welcome back, {user?.email?.split('@')[0]} 👋</h1>
               <p className="text-sm text-gray-600">Continue your learning journey — here are your latest stats and courses.</p>
             </div>
-            <div className="flex items-center gap-3">
-              <Link to="/profile" className="px-4 py-2 bg-white rounded-full shadow-sm border border-border/50 text-sm font-medium hover:shadow-md">View Profile</Link>
+            <div className="flex items-center gap-3">              <Link to="/subscription" className="px-4 py-2 bg-secondary text-foreground rounded-full text-sm font-medium hover:bg-secondary/80">Manage Subscription</Link>              <Link to="/profile" className="px-4 py-2 bg-white rounded-full shadow-sm border border-border/50 text-sm font-medium hover:shadow-md">View Profile</Link>
               <Link to="/courses" className="px-4 py-2 bg-gradient-to-r from-primary to-blue-600 text-white rounded-full text-sm font-semibold shadow">Browse Courses</Link>
             </div>
           </div>

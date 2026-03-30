@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, X, ArrowRight } from 'lucide-react';
+import { Check, X, ArrowRight, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const container = {
     hidden: { opacity: 0 },
@@ -20,6 +21,7 @@ const item = {
 
 export default function Pricing() {
     const [billingMonthly, setBillingMonthly] = useState(true);
+    const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
     const plans = [
         {
@@ -57,7 +59,7 @@ export default function Pricing() {
                 { name: 'Downloadable materials', included: false },
             ],
             cta: 'Start Free Trial',
-            ctaLink: '/register',
+            isPaid: true,
             highlighted: false,
         },
         {
@@ -76,7 +78,7 @@ export default function Pricing() {
                 { name: 'Downloadable materials', included: true },
             ],
             cta: 'Start Free Trial',
-            ctaLink: '/register',
+            isPaid: true,
             highlighted: true,
         },
         {
@@ -96,6 +98,7 @@ export default function Pricing() {
             ],
             cta: 'Contact Sales',
             ctaLink: '/contact',
+            isPaid: false, // For premium (enterprise) they just contact
             highlighted: false,
         },
     ];
@@ -105,6 +108,47 @@ export default function Pricing() {
         if (billingMonthly) return `$${monthly.toFixed(2)}`;
         const annual = monthly * 12 * 0.8; // 20% off annual
         return `$${annual.toFixed(2)}`;
+    };
+
+    const handleSubscribe = async (plan: any) => {
+        // Enforce user is logged in
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            window.location.href = '/login?redirect=/pricing';
+            return;
+        }
+
+        setLoadingPlan(plan.name);
+        try {
+            const amount = billingMonthly 
+                ? plan.monthly * 100 // Stripe expects cents
+                : Math.round(plan.monthly * 12 * 0.8 * 100);
+
+            const interval = billingMonthly ? 'month' : 'year';
+
+            const { data, error } = await supabase.functions.invoke('create-checkout', {
+                body: {
+                    planName: plan.name,
+                    amount: amount,
+                    interval: interval,
+                    successUrl: `${window.location.origin}/dashboard?checkout=success`,
+                    cancelUrl: `${window.location.origin}/pricing?checkout=canceled`
+                }
+            });
+
+            if (error) throw new Error(error.message || 'Error executing checkout');
+
+            if (data?.url) {
+                window.location.href = data.url;
+            } else {
+                throw new Error('Failed to create checkout session.');
+            }
+        } catch (error: any) {
+            console.error('Checkout error:', error);
+            alert(`Unable to checkout at this time. Please make sure the Edge Function is deployed. Error: ${error.message}`);
+        } finally {
+            setLoadingPlan(null);
+        }
     };
 
     const periodLabel = billingMonthly ? 'per month' : 'per year (billed annually)';
@@ -163,7 +207,7 @@ export default function Pricing() {
                                 key={idx}
                                 variants={item}
                                 whileHover={{ translateY: plan.highlighted ? -8 : -4 }}
-                                className={`relative rounded-2xl transition-all ${
+                                className={`relative rounded-2xl transition-all flex flex-col ${
                                     plan.highlighted
                                         ? 'border-2 border-primary shadow-2xl shadow-primary/20 transform md:-translate-y-4'
                                         : 'border border-border/50 shadow-sm hover:shadow-lg'
@@ -189,17 +233,32 @@ export default function Pricing() {
                                     </div>
 
                                     {/* CTA Button */}
-                                    <Link
-                                        to={plan.ctaLink}
-                                        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all text-center flex items-center justify-center gap-2 ${
-                                            plan.highlighted
-                                                ? 'bg-gradient-to-r from-primary to-blue-600 text-white hover:shadow-lg hover:shadow-primary/30'
-                                                : 'bg-secondary text-foreground hover:bg-secondary/80'
-                                        }`}
-                                    >
-                                        {plan.cta}
-                                        <ArrowRight className="h-4 w-4" />
-                                    </Link>
+                                    {plan.isPaid ? (
+                                        <button
+                                            onClick={() => handleSubscribe(plan)}
+                                            disabled={loadingPlan === plan.name}
+                                            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all text-center flex items-center justify-center gap-2 ${
+                                                plan.highlighted
+                                                    ? 'bg-gradient-to-r from-primary to-blue-600 text-white hover:shadow-lg hover:shadow-primary/30'
+                                                    : 'bg-secondary text-foreground hover:bg-secondary/80'
+                                            }`}
+                                        >
+                                            {loadingPlan === plan.name ? <Loader2 className="w-5 h-5 animate-spin"/> : plan.cta}
+                                            {loadingPlan !== plan.name && <ArrowRight className="h-4 w-4" />}
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            to={plan.ctaLink!}
+                                            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all text-center flex items-center justify-center gap-2 ${
+                                                plan.highlighted
+                                                    ? 'bg-gradient-to-r from-primary to-blue-600 text-white hover:shadow-lg hover:shadow-primary/30'
+                                                    : 'bg-secondary text-foreground hover:bg-secondary/80'
+                                            }`}
+                                        >
+                                            {plan.cta}
+                                            <ArrowRight className="h-4 w-4" />
+                                        </Link>
+                                    )}
 
                                     {/* Features */}
                                     <div className="border-t border-border/30 pt-8 space-y-4 flex-1">

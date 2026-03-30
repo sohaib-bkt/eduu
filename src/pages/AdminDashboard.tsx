@@ -133,6 +133,14 @@ export default function AdminDashboard() {
     if (!confirm('Are you sure you want to delete this course?')) return;
 
     try {
+      // First delete associated enrollments to avoid foreign key constraints
+      const { error: enrollmentsError } = await supabase
+        .from('enrollments')
+        .delete()
+        .eq('course_id', courseId);
+        
+      if (enrollmentsError) throw enrollmentsError;
+
       const { error: deleteError } = await supabase
         .from('courses')
         .delete()

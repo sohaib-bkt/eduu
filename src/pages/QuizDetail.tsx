@@ -1,75 +1,148 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, RotateCcw, Loader2 } from 'lucide-react';
+import { getQuizzesByLesson, submitQuiz } from '../lib/api';
+import { supabase } from '../lib/supabase';
 
 interface Question {
   id: string;
   question: string;
   options: string[];
-  correct_option: number; // index of correct option
+  correct_option: number;
   explanation?: string;
 }
 
 interface QuizState {
   currentQuestion: number;
-  userAnswers: (number | null)[]; // user's answer index for each question
+  userAnswers: (number | null)[];
   submitted: boolean;
 }
 
-// Demo quiz questions for the lesson
-const DEMO_QUESTIONS: Question[] = [
-  {
-    id: '1',
-    question: 'What is the capital of France?',
-    options: ['London', 'Berlin', 'Paris', 'Madrid'],
-    correct_option: 2,
-    explanation: 'Paris is the capital and largest city of France.',
-  },
-  {
-    id: '2',
-    question: 'Which planet is closest to the Sun?',
-    options: ['Venus', 'Mercury', 'Earth', 'Mars'],
-    correct_option: 1,
-    explanation: 'Mercury is the smallest planet and closest to the Sun in our solar system.',
-  },
-  {
-    id: '3',
-    question: 'What is the chemical symbol for Gold?',
-    options: ['Go', 'Gd', 'Au', 'Ag'],
-    correct_option: 2,
-    explanation: 'Au is the chemical symbol for Gold, from its Latin name "Aurum".',
-  },
-  {
-    id: '4',
-    question: 'Which of these is a programming language?',
-    options: ['HTML', 'Python', 'CSS', 'XML'],
-    correct_option: 1,
-    explanation: 'Python is a high-level programming language used for web development, data analysis, AI, and more.',
-  },
-  {
-    id: '5',
-    question: 'What is the largest ocean on Earth?',
-    options: ['Atlantic Ocean', 'Indian Ocean', 'Arctic Ocean', 'Pacific Ocean'],
-    correct_option: 3,
-    explanation: 'The Pacific Ocean is the largest and deepest of the five oceanic divisions.',
-  },
-];
-
 export default function QuizDetail() {
+  const { lessonId } = useParams<{ lessonId: string }>(); // Getting lessonId from path="quiz/:lessonId"
+  const id = lessonId; // Alias to match the rest of the file variable without changing everything
   const navigate = useNavigate();
+
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [quizId, setQuizId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   const [quizState, setQuizState] = useState<QuizState>({
     currentQuestion: 0,
-    userAnswers: new Array(DEMO_QUESTIONS.length).fill(null),
+    userAnswers: [],
     submitted: false,
   });
 
-  const currentQuestion = DEMO_QUESTIONS[quizState.currentQuestion];
-  const isLastQuestion = quizState.currentQuestion === DEMO_QUESTIONS.length - 1;
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadQuiz() {
+      if (!id) {
+        if (mounted) {
+          setError('No lesson ID provided in URL.');
+          setLoading(false);
+        }
+        return;
+      }
+
+      console.log('Loading quiz for lesson ID:', id);
+
+      try {
+        setLoading(true);
+        const quizzes = await getQuizzesByLesson(id);
+        console.log('Fetched quizzes:', quizzes);
+
+        if (!mounted) return;
+
+        if (!quizzes || quizzes.length === 0) {
+          setError('No quiz found for this lesson. You may need to run the AI analysis first.');
+          return;
+        }
+
+        const quiz = quizzes[0];
+        setQuizId(quiz.id);
+
+        const dbQuestions = quiz.quiz_questions || [];
+        dbQuestions.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+
+        const mappedQuestions: Question[] = dbQuestions.map((q: any) => {
+          const opts = q.quiz_options || [];
+          opts.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+
+          const correctIndex = opts.findIndex((o: any) => o.is_correct);
+
+          return {
+            id: q.id,
+            question: q.question_text,
+            options: opts.map((o: any) => o.option_text),
+            correct_option: correctIndex !== -1 ? correctIndex : 0,
+            explanation: q.explanation
+          };
+        });
+
+        if (mappedQuestions.length === 0) {
+          setError('This quiz exists but has no questions.');
+          return;
+        }
+
+        setQuestions(mappedQuestions);
+        setQuizState({
+          currentQuestion: 0,
+          userAnswers: new Array(mappedQuestions.length).fill(null),
+          submitted: false,
+        });
+        console.log('Loaded mapped questions:', mappedQuestions);
+      } catch (err: any) {
+        if (!mounted) return;
+        setError(err.message || 'Failed to load quiz metadata. Please check database connection.');
+        console.error('Quiz load error:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadQuiz();
+
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || questions.length === 0) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-gradient-to-br from-background via-background to-primary/5 p-4">
+        <div className="p-6 bg-card rounded-xl shadow-sm border border-border/50 max-w-md w-full text-center">
+          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Unable to Load Quiz</h2>
+          <p className="text-muted-foreground mb-6">{error || 'No questions available.'}</p>
+          <button 
+            onClick={() => navigate(-1)} 
+            className="w-full px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all font-medium"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentQuestion = questions[quizState.currentQuestion];
+  const isLastQuestion = quizState.currentQuestion === questions.length - 1;
   const allAnswered = quizState.userAnswers.every((ans) => ans !== null);
 
   const handleSelectAnswer = (optionIndex: number) => {
-    if (quizState.submitted) return; // Prevent changes after submission
+    if (quizState.submitted) return;
 
     const newAnswers = [...quizState.userAnswers];
     newAnswers[quizState.currentQuestion] = optionIndex;
@@ -78,6 +151,7 @@ export default function QuizDetail() {
 
   const handleNext = () => {
     if (!isLastQuestion) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       setQuizState({
         ...quizState,
         currentQuestion: quizState.currentQuestion + 1,
@@ -87,6 +161,7 @@ export default function QuizDetail() {
 
   const handlePrevious = () => {
     if (quizState.currentQuestion > 0) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       setQuizState({
         ...quizState,
         currentQuestion: quizState.currentQuestion - 1,
@@ -94,26 +169,45 @@ export default function QuizDetail() {
     }
   };
 
-  const handleSubmit = () => {
-    if (allAnswered) {
-      setQuizState({ ...quizState, submitted: true });
+  const handleSubmit = async () => {
+    if (allAnswered && !submitting) {
+      setSubmitting(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && quizId) {
+          const passThreshold = 70;
+          const currentScore = quizState.userAnswers.reduce((acc: number, answer: number | null, idx: number) => {
+            return acc + (answer === questions[idx].correct_option ? 1 : 0);
+          }, 0);
+          const currentPercentage = Math.round((currentScore / questions.length) * 100);
+          const passed = currentPercentage >= passThreshold;
+
+          await submitQuiz(quizId, session.user.id, currentPercentage, passed);
+        }
+      } catch (err) {
+        console.error('Error submitting quiz:', err);
+      } finally {
+        setSubmitting(false);
+        setQuizState({ ...quizState, submitted: true });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
   };
 
   const handleReset = () => {
     setQuizState({
       currentQuestion: 0,
-      userAnswers: new Array(DEMO_QUESTIONS.length).fill(null),
+      userAnswers: new Array(questions.length).fill(null),
       submitted: false,
     });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Calculate score
   const score = quizState.userAnswers.reduce((acc: number, answer: number | null, idx: number) => {
-    return acc + (answer === DEMO_QUESTIONS[idx].correct_option ? 1 : 0);
+    return acc + (answer === questions[idx].correct_option ? 1 : 0);
   }, 0);
 
-  const percentage = Math.round((score / DEMO_QUESTIONS.length) * 100);
+  const percentage = Math.round((score / questions.length) * 100);
   const passed = percentage >= 70;
 
   if (quizState.submitted) {
@@ -132,9 +226,8 @@ export default function QuizDetail() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-card rounded-2xl p-12 border border-border/50 shadow-sm text-center"
+            className="bg-card rounded-2xl p-6 sm:p-12 border border-border/50 shadow-sm text-center"
           >
-            {/* Result Icon */}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -152,7 +245,6 @@ export default function QuizDetail() {
               )}
             </motion.div>
 
-            {/* Result Text */}
             <h2 className="text-4xl font-bold mb-4">
               {passed ? 'Quiz Passed!' : 'Quiz Failed'}
             </h2>
@@ -160,15 +252,14 @@ export default function QuizDetail() {
             <div className="bg-muted/50 rounded-xl p-8 mb-8">
               <p className="text-6xl font-bold text-primary mb-2">{percentage}%</p>
               <p className="text-lg text-muted-foreground">
-                You answered {score} out of {DEMO_QUESTIONS.length} questions correctly
+                You answered {score} out of {questions.length} questions correctly
               </p>
             </div>
 
-            {/* Answer Review */}
             <div className="mb-8 text-left">
               <h3 className="text-xl font-semibold mb-4">Answer Review</h3>
               <div className="space-y-4">
-                {DEMO_QUESTIONS.map((q, idx) => {
+                {questions.map((q, idx) => {
                   const isCorrect = quizState.userAnswers[idx] === q.correct_option;
                   const userAnswer = quizState.userAnswers[idx];
 
@@ -218,8 +309,7 @@ export default function QuizDetail() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -247,7 +337,6 @@ export default function QuizDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -258,34 +347,30 @@ export default function QuizDetail() {
             <ArrowLeft className="h-4 w-4" /> Back
           </motion.button>
           <div className="text-sm text-muted-foreground font-medium">
-            Question {quizState.currentQuestion + 1} of {DEMO_QUESTIONS.length}
+            Question {quizState.currentQuestion + 1} of {questions.length}
           </div>
         </div>
 
-        {/* Progress Bar */}
         <motion.div className="w-full h-2 bg-secondary rounded-full overflow-hidden mb-8">
           <motion.div
             className="h-full bg-gradient-to-r from-primary to-primary/60"
             initial={{ width: 0 }}
             animate={{
-              width: `${((quizState.currentQuestion + 1) / DEMO_QUESTIONS.length) * 100}%`,
+              width: `${((quizState.currentQuestion + 1) / questions.length) * 100}%`,
             }}
             transition={{ duration: 0.5 }}
           />
         </motion.div>
 
-        {/* Quiz Card */}
         <motion.div
           key={quizState.currentQuestion}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm"
+          className="bg-card rounded-2xl p-6 sm:p-8 border border-border/50 shadow-sm"
         >
-          {/* Question */}
           <h2 className="text-2xl font-bold mb-8">{currentQuestion.question}</h2>
 
-          {/* Options */}
           <div className="space-y-4 mb-8">
             <AnimatePresence>
               {currentQuestion.options.map((option, idx) => {
@@ -310,7 +395,7 @@ export default function QuizDetail() {
                   >
                     <div className="flex items-center gap-4">
                       <div
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                           isSelected
                             ? 'border-primary bg-primary'
                             : 'border-muted-foreground/30'
@@ -328,8 +413,7 @@ export default function QuizDetail() {
             </AnimatePresence>
           </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -357,19 +441,18 @@ export default function QuizDetail() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleSubmit}
-                disabled={!allAnswered}
-                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold"
+                disabled={!allAnswered || submitting}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-bold flex align-center justify-center"
               >
-                Submit Quiz
+                {submitting ? <Loader2 className="w-5 h-5 animate-spin mx-auto"/> : "Submit Quiz"}
               </motion.button>
             )}
           </div>
 
-          {/* Question Indicator */}
           <div className="mt-8 pt-6 border-t border-border/30">
             <p className="text-sm text-muted-foreground mb-3">Questions answered:</p>
             <div className="flex flex-wrap gap-2">
-              {DEMO_QUESTIONS.map((_, idx) => (
+              {questions.map((_, idx) => (
                 <motion.button
                   key={idx}
                   onClick={() => {

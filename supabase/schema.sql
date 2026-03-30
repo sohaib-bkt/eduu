@@ -29,6 +29,10 @@ returns trigger as $$
 begin
   insert into public.profiles (id, email, full_name, avatar_url)
   values (new.id, new.email, new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'avatar_url');
+
+  insert into public.subscriptions (user_id, plan_type, status, start_date)
+  values (new.id, 'free', 'active', timezone('utc'::text, now()));
+
   return new;
 end;
 $$ language plpgsql security definer;
@@ -196,6 +200,15 @@ alter table public.subscriptions enable row level security;
 create policy "Users can view their own subscription."
   on subscriptions for select
   using ( auth.uid() = user_id );
+
+create policy "Users can insert their own subscription."
+  on subscriptions for insert
+  with check ( auth.uid() = user_id );
+
+create policy "Users can update their own subscription."
+  on subscriptions for update
+  using ( auth.uid() = user_id )
+  with check ( auth.uid() = user_id );
 
 -- Create messages/support table
 create table public.messages (

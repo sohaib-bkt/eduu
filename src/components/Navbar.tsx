@@ -96,7 +96,7 @@ export default function Navbar() {
 
                     {/* Desktop Navigation */}
                     <div className="hidden md:flex items-center space-x-1">
-                        {navLinks.map((link) => (
+                        {!session && navLinks.map((link) => (
                             <Link
                                 key={link.name}
                                 to={link.path}
@@ -129,6 +129,17 @@ export default function Navbar() {
                                         <span className="font-medium">Admin</span>
                                     </Link>
                                 )}
+                                <Link
+                                    to="/subscription"
+                                    className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+                                        isActive('/subscription')
+                                            ? 'bg-primary/10 text-primary'
+                                            : 'bg-secondary text-foreground hover:bg-secondary/80'
+                                    }`}
+                                >
+                                    <Settings size={18} />
+                                    <span className="font-medium">Manage Subscription</span>
+                                </Link>
                                 <Link
                                     to="/dashboard"
                                     className={`flex items-center space-x-2 px-5 py-2 rounded-full transition-all ${
@@ -193,7 +204,7 @@ export default function Navbar() {
                         className="md:hidden border-t border-border bg-background/95 backdrop-blur-md"
                     >
                         <div className="px-4 py-6 space-y-3 sm:px-6">
-                            {navLinks.map((link) => (
+                            {!session && navLinks.map((link) => (
                                 <Link
                                     key={link.name}
                                     to={link.path}

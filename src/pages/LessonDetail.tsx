@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
-import { getLessonById } from '../lib/api';
-import { ArrowLeft, BookOpen, Clock, HelpCircle } from 'lucide-react';
+import { getLessonById, updateLessonSummary, createQuizFromAI, getQuizzesByLesson } from '../lib/api';
+import { analyzeLessonMedia } from '../lib/gemini';
+import { ArrowLeft, BookOpen, Clock, HelpCircle, Sparkles, Loader2, CheckCircle2 } from 'lucide-react';
 import VideoPlayer from '../components/VideoPlayer';
 
 interface Lesson {
@@ -15,6 +16,7 @@ interface Lesson {
   audio_url?: string | null;
   pdf_url?: string | null;
   module_id?: string;
+  content?: string | null;
 }
 
 export default function LessonDetail() {
@@ -24,6 +26,9 @@ export default function LessonDetail() {
   const [loading, setLoading] = useState(true);
   const [media, setMedia] = useState<{ video?: string; audio?: string; pdf?: string }>({});
   const [user, setUser] = useState<any>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'analyzing' | 'done' | 'error'>('idle');
+  const [hasQuiz, setHasQuiz] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -40,6 +45,10 @@ export default function LessonDetail() {
       try {
         const data = await getLessonById(id);
         setLesson(data);
+
+        // Check if lesson already has a quiz
+        const quizzes = await getQuizzesByLesson(id);
+        setHasQuiz(quizzes && quizzes.length > 0);
 
         const tryParseBucketAndPath = (u: string) => {
           try {
@@ -99,6 +108,44 @@ export default function LessonDetail() {
     load();
   }, [id]);
 
+  const handleAIAnalysis = async () => {
+    if (!lesson || !id) return;
+
+    setAnalyzing(true);
+    setAnalysisStatus('analyzing');
+
+    try {
+      const mediaUrl = media.video || media.audio || media.pdf;
+      const mediaType = media.video ? 'video' : media.audio ? 'audio' : 'pdf';
+
+      if (!mediaUrl) {
+        throw new Error("No media available to analyze");
+      }
+
+      const result = await analyzeLessonMedia(mediaUrl, mediaType);
+
+      // Update lesson summary in DB
+      await updateLessonSummary(id, result.summary);
+
+      // Update local state
+      setLesson({ ...lesson, content: result.summary });
+
+      // Create quiz if it doesn't exist
+      if (!hasQuiz && result.quiz) {
+        await createQuizFromAI(id, result.quiz);
+        setHasQuiz(true);
+      }
+
+      setAnalysisStatus('done');
+      setTimeout(() => setAnalysisStatus('idle'), 3000);
+    } catch (error) {
+      console.error("AI Analysis failed:", error);
+      setAnalysisStatus('error');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   if (!lesson) return <div className="min-h-screen flex items-center justify-center">Lesson not found</div>;
 
@@ -114,16 +161,42 @@ export default function LessonDetail() {
         </button>
 
         <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
-          <h1 className="text-3xl font-bold mb-2">{lesson.title}</h1>
-          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4" />
-              <span>Lesson</span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">{lesson.title}</h1>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  <span>Lesson</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>{minutes} min</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              <span>{minutes} min</span>
-            </div>
+
+            {canView && (
+              <button
+                onClick={handleAIAnalysis}
+                disabled={analyzing}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-medium transition-all ${analysisStatus === 'done'
+                    ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                    : analysisStatus === 'error'
+                      ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                      : 'bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20'
+                  }`}
+              >
+                {analyzing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : analysisStatus === 'done' ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {analyzing ? 'Analyzing...' : analysisStatus === 'done' ? 'Analyzed' : 'Analyze with AI'}
+              </button>
+            )}
           </div>
 
           {!canView && (
@@ -133,41 +206,71 @@ export default function LessonDetail() {
           )}
 
           {canView && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               {media.video && (
                 <VideoPlayer src={media.video} title={lesson.title} />
               )}
 
               {media.audio && (
-                <audio controls src={media.audio} className="w-full" />
+                <div className="p-6 bg-muted/20 rounded-xl border border-border/50">
+                  <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" /> Audio Lesson
+                  </h3>
+                  <audio controls src={media.audio} className="w-full" />
+                </div>
               )}
 
               {media.pdf && (
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border border-border/50 rounded-xl overflow-hidden shadow-sm">
                   <iframe src={media.pdf} title="PDF" className="w-full h-[700px]" />
                 </div>
               )}
 
               {!media.video && !media.audio && !media.pdf && (
-                <div className="p-6 bg-muted/10 rounded-lg">No media available for this lesson.</div>
+                <div className="p-6 bg-muted/10 rounded-lg text-center text-muted-foreground">
+                  No media available for this lesson.
+                </div>
               )}
 
-              {/* Quiz Section */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-8 pt-8 border-t border-border/30"
-              >
-                <button
-                  onClick={() => navigate(`/quiz/${id}`)}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-primary to-primary/80 text-white rounded-lg hover:shadow-lg transition-shadow font-semibold flex items-center justify-center gap-2"
-                >
-                  <HelpCircle className="h-5 w-5" />
-                  Take Quiz
-                </button>
-              </motion.div>
+              {/* Summary Section */}
+              <AnimatePresence>
+                {lesson.content && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-4"
+                  >
+                    <div className="flex items-center gap-2 text-xl font-bold text-primary">
+                      <Sparkles className="h-5 w-5" />
+                      AI Summary
+                    </div>
+                    <div className="prose dark:prose-invert max-w-none p-6 bg-primary/5 rounded-2xl border border-primary/10">
+                      {lesson.content.split('\n').map((para, i) => (
+                        <p key={i} className="mb-4 text-foreground/80 leading-relaxed last:mb-0">
+                          {para}
+                        </p>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              {/* TODO: resources, notes */}
+              {/* Quiz Section */}
+              {(hasQuiz || analysisStatus === 'done') && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-8 pt-8 border-t border-border/30"
+                >
+                  <button
+                    onClick={() => navigate(`/quiz/${id}`)}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-primary to-primary/80 text-white rounded-xl hover:shadow-lg hover:shadow-primary/20 transition-all font-semibold flex items-center justify-center gap-2 transform hover:-translate-y-0.5"
+                  >
+                    <HelpCircle className="h-5 w-5" />
+                    Take Quiz
+                  </button>
+                </motion.div>
+              )}
             </div>
           )}
         </div>
