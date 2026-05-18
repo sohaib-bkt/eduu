@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
+import ChatBot from './ChatBot';
 import { Mail, Phone, MapPin, Linkedin, Twitter, Facebook } from 'lucide-react';
 
 export default function Layout() {
@@ -94,6 +95,7 @@ export default function Layout() {
                     </div>
                 </div>
             </footer>
+            <ChatBot />
         </div>
     );
 }

@@ -2,6 +2,39 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || "");
 
+export type ChatMessage = {
+  role: "user" | "model";
+  content: string;
+};
+
+const CHATBOT_SYSTEM_INSTRUCTION =
+  "Tu es un assistant pédagogique pour EduBloom, une plateforme d'apprentissage universitaire. Réponds de façon claire et concise aux questions des étudiants sur leurs cours, leurs devoirs, et leurs apprentissages. Réponds en français sauf si l'étudiant écrit dans une autre langue.";
+
+export async function chatWithBot(
+  history: ChatMessage[],
+  userMessage: string
+): Promise<string> {
+  if (!import.meta.env.VITE_GEMINI_API_KEY) {
+    throw new Error(
+      "Gemini API Key is missing. Please add VITE_GEMINI_API_KEY to your .env file."
+    );
+  }
+
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: CHATBOT_SYSTEM_INSTRUCTION,
+  });
+
+  const geminiHistory = history.map((m) => ({
+    role: m.role,
+    parts: [{ text: m.content }],
+  }));
+
+  const chat = model.startChat({ history: geminiHistory });
+  const result = await chat.sendMessage(userMessage);
+  return result.response.text();
+}
+
 export async function analyzeLessonMedia(mediaUrl: string, mediaType: 'video' | 'audio' | 'pdf') {
   if (!import.meta.env.VITE_GEMINI_API_KEY) {
     throw new Error("Gemini API Key is missing. Please add VITE_GEMINI_API_KEY to your .env file.");
