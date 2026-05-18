@@ -33,6 +33,7 @@ function App() {
           <Route path="admin" element={<AdminDashboard />} />
           <Route path="admin/courses/:courseId" element={<CourseEditor />} />
           <Route path="admin/modules/:moduleId/add-lesson" element={<AddLessonPage />} />
+          <Route path="admin/lessons/:lessonId/edit" element={<AddLessonPage />} />
           <Route path="lesson/:id" element={<LessonDetail />} />
           <Route path="quiz/:lessonId" element={<QuizDetail />} />
           <Route path="support-messages" element={<MySupportMessages />} />

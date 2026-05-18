@@ -36,6 +36,7 @@ export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [formData, setFormData] = useState<CourseFormData>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -93,7 +94,27 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAddCourse = async (e: React.FormEvent) => {
+  const handleEditCourse = (course: Course) => {
+    setEditingCourseId(course.id);
+    setFormData({
+      title: course.title,
+      description: course.description || '',
+      category: course.category || '',
+      difficulty: (course.difficulty as CourseFormData['difficulty']) || 'beginner',
+      thumbnail_url: course.thumbnail_url || '',
+    });
+    setShowForm(true);
+    setError('');
+    setSuccess('');
+  };
+
+  const resetCourseForm = () => {
+    setFormData(defaultForm);
+    setEditingCourseId(null);
+    setShowForm(false);
+  };
+
+  const handleSaveCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -104,25 +125,35 @@ export default function AdminDashboard() {
     }
 
     try {
-      const { error: insertError } = await supabase
-        .from('courses')
-        .insert([
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        difficulty: formData.difficulty,
+        thumbnail_url: formData.thumbnail_url,
+      };
+
+      if (editingCourseId) {
+        const { error: updateError } = await supabase
+          .from('courses')
+          .update(payload)
+          .eq('id', editingCourseId);
+
+        if (updateError) throw updateError;
+        setSuccess('Course updated successfully!');
+      } else {
+        const { error: insertError } = await supabase.from('courses').insert([
           {
-            title: formData.title,
-            description: formData.description,
-            category: formData.category,
-            difficulty: formData.difficulty,
-            thumbnail_url: formData.thumbnail_url,
+            ...payload,
             instructor_id: user.id,
           },
-        ])
-        .select();
+        ]);
 
-      if (insertError) throw insertError;
+        if (insertError) throw insertError;
+        setSuccess('Course created successfully!');
+      }
 
-      setSuccess('Course created successfully!');
-      setFormData(defaultForm);
-      setShowForm(false);
+      resetCourseForm();
       fetchCourses();
     } catch (err: any) {
       setError(err.message);
@@ -130,23 +161,16 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course?')) return;
+    if (!confirm('Are you sure you want to delete this course? All modules and lessons will be removed.')) return;
 
     try {
-      // First delete associated enrollments to avoid foreign key constraints
-      const { error: enrollmentsError } = await supabase
-        .from('enrollments')
-        .delete()
-        .eq('course_id', courseId);
-        
-      if (enrollmentsError) throw enrollmentsError;
-
-      const { error: deleteError } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', courseId);
-
+      setError('');
+      const { error: deleteError } = await supabase.from('courses').delete().eq('id', courseId);
       if (deleteError) throw deleteError;
+
+      if (editingCourseId === courseId) {
+        resetCourseForm();
+      }
 
       setSuccess('Course deleted successfully!');
       fetchCourses();
@@ -189,7 +213,7 @@ export default function AdminDashboard() {
               <p className="text-gray-600">Manage courses, videos, audio lessons, and PDFs</p>
             </div>
             <button
-              onClick={() => setShowForm(!showForm)}
+              onClick={() => (showForm ? resetCourseForm() : setShowForm(true))}
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary to-blue-600 text-white rounded-full font-semibold hover:shadow-lg transition-all"
             >
               <Plus className="h-5 w-5" />
@@ -244,8 +268,10 @@ export default function AdminDashboard() {
         {/* Course Form */}
         {showForm && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-white rounded-xl p-8 border border-border/30 shadow-sm">
-            <h2 className="text-2xl font-bold mb-6">Create New Course</h2>
-            <form onSubmit={handleAddCourse} className="space-y-6">
+            <h2 className="text-2xl font-bold mb-6">
+              {editingCourseId ? 'Edit Course' : 'Create New Course'}
+            </h2>
+            <form onSubmit={handleSaveCourse} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Course Title *</label>
@@ -308,7 +334,7 @@ export default function AdminDashboard() {
               <div className="flex gap-4 justify-end">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
+                  onClick={resetCourseForm}
                   className="px-6 py-2 border border-border/50 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   Cancel
@@ -317,7 +343,7 @@ export default function AdminDashboard() {
                   type="submit"
                   className="px-8 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors"
                 >
-                  Create Course
+                  {editingCourseId ? 'Save Changes' : 'Create Course'}
                 </button>
               </div>
             </form>
@@ -379,14 +405,23 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="flex gap-2">
-                      <Link
-                        to={`/admin/courses/${course.id}`}
+                      <button
+                        type="button"
+                        onClick={() => handleEditCourse(course)}
                         className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-primary transition-colors"
-                        title="Edit course"
+                        title="Edit course details"
                       >
                         <Edit2 className="h-5 w-5" />
+                      </button>
+                      <Link
+                        to={`/admin/courses/${course.id}`}
+                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition-colors"
+                        title="Manage modules and lessons"
+                      >
+                        <BookOpen className="h-5 w-5" />
                       </Link>
                       <button
+                        type="button"
                         onClick={() => handleDeleteCourse(course.id)}
                         className="p-2 rounded-lg hover:bg-red-100 text-gray-600 hover:text-red-600 transition-colors"
                         title="Delete course"

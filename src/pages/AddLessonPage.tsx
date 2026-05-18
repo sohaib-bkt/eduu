@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -23,9 +23,13 @@ const defaultForm: LessonFormData = {
 };
 
 export default function AddLessonPage() {
-  const { moduleId } = useParams<{ moduleId: string }>();
+  const { moduleId, lessonId } = useParams<{ moduleId?: string; lessonId?: string }>();
+  const isEditMode = Boolean(lessonId);
+  const [resolvedModuleId, setResolvedModuleId] = useState(moduleId || '');
+  const [courseId, setCourseId] = useState<string | null>(null);
   const [formData, setFormData] = useState<LessonFormData>(defaultForm);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
@@ -33,6 +37,41 @@ export default function AddLessonPage() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (lessonId) {
+      loadLesson(lessonId);
+    }
+  }, [lessonId]);
+
+  const loadLesson = async (id: string) => {
+    try {
+      setError('');
+      const { data, error: fetchError } = await supabase
+        .from('lessons')
+        .select('*, modules(course_id)')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!data) throw new Error('Lesson not found');
+
+      setFormData({
+        title: data.title || '',
+        video_url: data.video_url || '',
+        audio_url: data.audio_url || '',
+        pdf_url: data.pdf_url || '',
+        duration: data.duration || 0,
+        is_free: data.is_free || false,
+      });
+      setResolvedModuleId(data.module_id);
+      setCourseId(data.modules?.course_id ?? null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileUpload = async (
     file: File,
@@ -44,8 +83,14 @@ export default function AddLessonPage() {
     setError('');
     setUploadProgress({ ...uploadProgress, [fieldName]: 0 });
 
+    const uploadModuleId = resolvedModuleId || moduleId;
+    if (!uploadModuleId) {
+      setError('Module not found');
+      return;
+    }
+
     const fileExt = file.name.split('.').pop();
-    const fileName = `${moduleId}/${Date.now()}.${fileExt}`;
+    const fileName = `${uploadModuleId}/${Date.now()}.${fileExt}`;
 
     try {
       // Note: In production, use resumable uploads or chunking for large files
@@ -57,10 +102,10 @@ export default function AddLessonPage() {
 
       const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
 
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         [fieldName]: publicUrlData.publicUrl,
-      });
+      }));
 
       setSuccess(`${bucket === 'videos' ? 'Video' : bucket === 'audios' ? 'Audio' : 'PDF'} uploaded successfully!`);
       setUploadProgress({ ...uploadProgress, [fieldName]: 100 });
@@ -69,7 +114,7 @@ export default function AddLessonPage() {
     }
   };
 
-  const handleAddLesson = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -84,38 +129,63 @@ export default function AddLessonPage() {
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
 
     try {
-      const { error: insertError } = await supabase
-        .from('lessons')
-        .insert([
-          {
-            module_id: moduleId,
-            title: formData.title,
-            video_url: formData.video_url || null,
-            audio_url: formData.audio_url || null,
-            pdf_url: formData.pdf_url || null,
-            duration: formData.duration || 0,
-            is_free: formData.is_free,
-            order_index: 0,
-          },
-        ])
-        .select();
+      const payload = {
+        title: formData.title,
+        video_url: formData.video_url || null,
+        audio_url: formData.audio_url || null,
+        pdf_url: formData.pdf_url || null,
+        duration: formData.duration || 0,
+        is_free: formData.is_free,
+      };
 
-      if (insertError) throw insertError;
+      if (isEditMode && lessonId) {
+        const { error: updateError } = await supabase.from('lessons').update(payload).eq('id', lessonId);
+        if (updateError) throw updateError;
+        setSuccess('Lesson updated successfully!');
+      } else {
+        if (!moduleId) {
+          setError('Module not found');
+          return;
+        }
 
-      setSuccess('Lesson created successfully!');
-      setFormData(defaultForm);
+        const { error: insertError } = await supabase.from('lessons').insert([
+          { ...payload, module_id: moduleId, order_index: 0 },
+        ]);
+        if (insertError) throw insertError;
+        setSuccess('Lesson created successfully!');
+        setFormData(defaultForm);
+      }
+
       setTimeout(() => {
-        window.history.back();
+        if (courseId) {
+          window.location.href = `/admin/courses/${courseId}`;
+        } else {
+          window.history.back();
+        }
       }, 1500);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+
+  const backHref = courseId ? `/admin/courses/${courseId}` : '/admin';
+
+  if (loading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex items-center justify-center min-h-screen pt-20"
+      >
+        <p className="text-lg text-gray-600">Loading lesson...</p>
+      </motion.div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 pt-20">
@@ -123,13 +193,13 @@ export default function AddLessonPage() {
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
           <Link
-            to="/admin"
+            to={backHref}
             className="inline-flex items-center gap-2 text-primary hover:text-primary/80 mb-4 font-medium"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
+            Back to Course
           </Link>
-          <h1 className="text-4xl font-bold mb-2">Create New Lesson</h1>
+          <h1 className="text-4xl font-bold mb-2">{isEditMode ? 'Edit Lesson' : 'Create New Lesson'}</h1>
           <p className="text-gray-600">Add videos, audio lessons, and PDF documents</p>
         </motion.div>
 
@@ -162,7 +232,7 @@ export default function AddLessonPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-xl p-8 border border-border/30 shadow-sm"
         >
-          <form onSubmit={handleAddLesson} className="space-y-8">
+          <form onSubmit={handleSubmit} className="space-y-8">
             {/* Basic Info */}
             <div>
               <h2 className="text-xl font-bold mb-6">Lesson Details</h2>
@@ -346,17 +416,23 @@ export default function AddLessonPage() {
             <div className="flex gap-4 justify-end pt-6 border-t border-border/20">
               <button
                 type="button"
-                onClick={() => window.history.back()}
+                onClick={() => {
+                  if (courseId) {
+                    window.location.href = `/admin/courses/${courseId}`;
+                  } else {
+                    window.history.back();
+                  }
+                }}
                 className="px-6 py-2 border border-border/50 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={saving}
                 className="px-8 py-2 bg-primary text-white rounded-lg font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Create Lesson'}
+                {saving ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Lesson'}
               </button>
             </div>
           </form>
