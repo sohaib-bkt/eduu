@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { formatAuthError } from '../lib/authErrors';
+import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
@@ -18,39 +17,29 @@ export default function Register() {
         setLoading(true);
         setError(null);
 
-        if (!isSupabaseConfigured) {
-            setError(formatAuthError('Failed to fetch'));
+        const { data: { session }, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: {
+                    full_name: fullName,
+                },
+            },
+        });
+
+        if (signUpError) {
+            setError(signUpError.message);
             setLoading(false);
             return;
         }
 
-        try {
-            const { data: { session }, error: signUpError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        full_name: fullName,
-                    },
-                },
-            });
+        if (session) {
 
-            if (signUpError) {
-                setError(formatAuthError(signUpError.message));
-                return;
-            }
 
-            if (session) {
-                navigate('/dashboard');
-            } else {
-                setError(
-                    'Vérifiez votre boîte mail pour confirmer le compte, ou désactivez la confirmation email dans Supabase (Authentication → Providers → Email).'
-                );
-            }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to fetch';
-            setError(formatAuthError(message));
-        } finally {
+            navigate('/dashboard');
+        } else {
+            // Email confirmation case
+            setError('Please check your email for the confirmation link.');
             setLoading(false);
         }
     };

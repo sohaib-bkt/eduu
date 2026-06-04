@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { formatAuthError } from '../lib/authErrors';
+import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
@@ -17,28 +16,16 @@ export default function Login() {
         setLoading(true);
         setError(null);
 
-        if (!isSupabaseConfigured) {
-            setError(formatAuthError('Failed to fetch'));
-            setLoading(false);
-            return;
-        }
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
 
-        try {
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) {
-                setError(formatAuthError(error.message));
-            } else {
-                navigate('/dashboard');
-            }
-        } catch (err) {
-            const message = err instanceof Error ? err.message : 'Failed to fetch';
-            setError(formatAuthError(message));
-        } finally {
+        if (error) {
+            setError(error.message);
             setLoading(false);
+        } else {
+            navigate('/dashboard');
         }
     };
 
