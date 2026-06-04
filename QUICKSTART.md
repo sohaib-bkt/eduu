@@ -42,7 +42,12 @@ After running `seed.sql`, use these to login:
 | jane.smith@example.com | password | Student |
 | prof.teacher@example.com | password | Instructor |
 
-**Note:** You need to set these passwords in Supabase Auth manually, OR sign up with the Register form to create new test accounts.
+**Note:** After reactivating a paused Supabase project, recreate demo auth users:
+
+1. Add `SUPABASE_SERVICE_ROLE_KEY` to `.env` (Supabase → Settings → API Keys → Secret key).
+2. Run: `npm run seed:auth`
+
+Or sign up via `/register` (disable email confirmation in Supabase if you want instant login).
 
 ## 📚 Test Data Included
 
